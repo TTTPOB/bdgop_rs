@@ -1,6 +1,9 @@
 use bdgop_rs::{
     bdg_record::{self, BdgRecord},
     bed_record::{self, BedLikeRecord},
+    bdg_operation::{
+        self
+    }
 };
 use csv::{Reader, ReaderBuilder, StringRecord, WriterBuilder};
 use serde::Serialize;

@@ -1,22 +1,37 @@
+pub mod bdg_operation {
+
+    use super::bdg_record::{self, BdgRecord};
+    use super::bed_record::{self, BedLikeRecord};
+    impl From<BedLikeRecord> for BdgRecord {
+        fn from(item: BedLikeRecord) -> BdgRecord {
+            BdgRecord {
+                chrom: item.chrom,
+                start: item.start,
+                end: item.end,
+                // default score 0
+                score: item.score.unwrap(),
+            }
+        }
+    }
+}
+
 pub mod bdg_record {
     use serde::{Deserialize, Serialize};
-    use serde_json::Number;
 
     pub const BDG_HEADERS: [&str; 4] = ["chrom", "start", "end", "score"];
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct BdgRecord {
-        chrom: String,
-        start: u32,
-        end: u32,
-        score: Number,
+        pub chrom: String,
+        pub start: u32,
+        pub end: u32,
+        pub score: f64,
     }
 }
 
 pub mod bed_record {
     use serde::de::{self, Visitor};
     use serde::{self, Deserialize, Serialize, Serializer};
-    use serde_json::Number;
 
     #[derive(Debug)]
     pub enum Strand {
@@ -67,20 +82,20 @@ pub mod bed_record {
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct BedLikeRecord {
-        chrom: String,
-        start: u32,
-        end: u32,
+        pub chrom: String,
+        pub start: u32,
+        pub end: u32,
 
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        name: Option<String>,
+        pub name: Option<String>,
 
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        score: Option<Number>,
+        pub score: Option<f64>,
 
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        strand: Option<Strand>,
+        pub strand: Option<Strand>,
     }
 }
