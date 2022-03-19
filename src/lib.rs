@@ -1,86 +1,73 @@
-pub mod bdg_record {
-    use serde::{Deserialize, Serialize};
-    use serde_json::Number;
+pub mod bedlike_record {
+    use csv;
+    use std::fmt;
 
-    pub const BDG_HEADERS: [&str; 4] = ["chrom", "start", "end", "score"];
+    pub struct BedLikeRecord<'a> {
+        chrom: &'a str,
+        start: &'a str,
+        end: &'a str,
+        other_fields: Vec<&'a str>,
+    }
 
-    #[derive(Debug, Serialize, Deserialize)]
-    pub struct BdgRecord {
-        chrom: String,
-        start: u32,
-        end: u32,
-        score: Number,
+    // construct a new BedLikeRecord from a CSV row
+    pub fn new(row: &csv::StringRecord) -> BedLikeRecord {
+        BedLikeRecord {
+            chrom: &row[0],
+            start: &row[1],
+            end: &row[2],
+            other_fields: row.iter().skip(3).collect(),
+        }
+    }
+    impl<'a> fmt::Display for BedLikeRecord<'a> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "{}\t{}\t{}", self.chrom, self.start, self.end)?;
+            for field in &self.other_fields {
+                write!(f, "\t{}", field)?;
+            }
+            Ok(())
+        }
     }
 }
 
-pub mod bed_record {
-    use serde::de::{self, Visitor};
-    use serde::{self, Deserialize, Serialize, Serializer};
-    use serde_json::Number;
+pub mod io {
 
-    #[derive(Debug)]
-    pub enum Strand {
-        Plus,
-        Minus,
-        Unknown,
+    use csv::{Reader, StringRecord};
+
+    use std::fs::File;
+    use std::io::{self, BufRead, BufReader, Read};
+
+    pub fn read_from_in_stream<T: io::BufRead>(
+        in_stream: T,
+        delim: Option<char>,
+    ) -> csv::Reader<T> {
+        let delim = delim.unwrap_or('\t');
+
+        let reader = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .delimiter(delim as u8)
+            .from_reader(in_stream);
+        reader
     }
 
-    struct StrandVisitor;
-    impl Serialize for Strand {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            match self {
-                Strand::Plus => serializer.serialize_char('+'),
-                Strand::Minus => serializer.serialize_char('-'),
-                Strand::Unknown => serializer.serialize_char('.'),
+    pub fn read(
+        infile: Option<String>,
+        delim: Option<char>,
+    ) -> csv::Reader<Box<dyn BufRead>> {
+        // if infile is none, read from stdin
+        let stream_reader: Box<dyn BufRead> = match infile {
+            Some(infile) => {
+                let file = File::open(infile).unwrap();
+                let buf_reader = io::BufReader::new(file);
+                Box::new(buf_reader)
             }
-        }
-    }
-    // implementing deserialize for Strand
-    impl<'de> Visitor<'de> for StrandVisitor {
-        type Value = Strand;
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a char, one of '+', '-' or '.'")
-        }
-        fn visit_char<E>(self, ch: char) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            match ch {
-                '+' => Ok(Strand::Plus),
-                '-' => Ok(Strand::Minus),
-                '.' => Ok(Strand::Unknown),
-                _ => Err(de::Error::invalid_value(de::Unexpected::Char(ch), &self)),
+            None => {
+                let buf_reader = io::BufReader::new(io::stdin());
+                Box::new(buf_reader)
             }
-        }
-    }
-    impl<'de> Deserialize<'de> for Strand {
-        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: de::Deserializer<'de>,
-        {
-            deserializer.deserialize_char(StrandVisitor)
-        }
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    pub struct BedLikeRecord {
-        chrom: String,
-        start: u32,
-        end: u32,
-
-        #[serde(default)]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        name: Option<String>,
-
-        #[serde(default)]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        score: Option<Number>,
-
-        #[serde(default)]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        strand: Option<Strand>,
+        };
+        let csv_reader = read_from_in_stream(stream_reader, delim);
+        csv_reader
     }
 }
+
+pub mod ops;
